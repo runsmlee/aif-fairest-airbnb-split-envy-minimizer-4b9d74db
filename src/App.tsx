@@ -21,20 +21,67 @@ function trackEvent(event: string, props?: Record<string, unknown>) {
   }
 }
 
+function readSharedResult(): {
+  result: SplitResult;
+  personNames: string[];
+  roomNames: string[];
+} | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const pParam = params.get('p');
+    const rParam = params.get('r');
+    const aParam = params.get('a');
+    const tParam = params.get('t');
+    const fParam = params.get('f');
+    const eParam = params.get('e');
+
+    if (!pParam || !rParam || !aParam || !tParam || !fParam || eParam === null) {
+      return null;
+    }
+
+    const personNames = pParam.split(',');
+    const roomNames = rParam.split(',');
+    const totalRent = Number(tParam);
+    const fairShare = Number(fParam);
+    const isEnvyFree = eParam === '1';
+
+    const assignments = aParam.split(';').map((seg) => {
+      const [pi, ri, price] = seg.split('-').map(Number);
+      return { personIndex: pi, roomIndex: ri, price };
+    });
+
+    return {
+      result: { assignments, isEnvyFree, totalRent, fairShare },
+      personNames,
+      roomNames,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
+  const shared = readSharedResult();
+
   const [savedState, setSavedState] = useLocalStorage<AppState | null>(STORAGE_KEY, null);
-  const [roommateCount, setRoommateCount] = useState(savedState?.roommateCount ?? 3);
+  const [roommateCount, setRoommateCount] = useState(
+    shared ? shared.personNames.length : (savedState?.roommateCount ?? 3),
+  );
   const [roomNames, setRoomNames] = useState<string[]>(
-    savedState?.roomNames ?? getDefaultNames(3, 'Room'),
+    shared ? shared.roomNames : (savedState?.roomNames ?? getDefaultNames(3, 'Room')),
   );
   const [personNames, setPersonNames] = useState<string[]>(
-    savedState?.personNames ?? getDefaultNames(3, 'Person'),
+    shared ? shared.personNames : (savedState?.personNames ?? getDefaultNames(3, 'Person')),
   );
   const [bids, setBids] = useState<number[][]>(
-    savedState?.bids ?? createEmptyBids(3),
+    shared ? createEmptyBids(shared.personNames.length) : (savedState?.bids ?? createEmptyBids(3)),
   );
-  const [totalRent, setTotalRent] = useState(savedState?.totalRent ?? 0);
-  const [result, setResult] = useState<SplitResult | null>(null);
+  const [totalRent, setTotalRent] = useState(
+    shared ? shared.result.totalRent : (savedState?.totalRent ?? 0),
+  );
+  const [result, setResult] = useState<SplitResult | null>(
+    shared ? shared.result : null,
+  );
 
   // Persist state to localStorage
   useEffect(() => {

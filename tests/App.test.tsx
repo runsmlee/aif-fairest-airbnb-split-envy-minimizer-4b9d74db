@@ -1,10 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import App from '../src/App';
 
 describe('App', () => {
   beforeEach(() => {
     localStorage.clear();
+    // Reset window.location
+    Object.defineProperty(window, 'location', {
+      value: {
+        origin: 'https://example.com',
+        href: 'https://example.com/',
+        search: '',
+      },
+      writable: true,
+    });
   });
 
   it('renders the product name as h1', () => {
@@ -207,5 +216,35 @@ describe('App', () => {
     // Change roommate count — should clear results
     fireEvent.click(screen.getByLabelText(/Add one roommate/i));
     expect(screen.queryByText(/Fair Split Results/i)).not.toBeInTheDocument();
+  });
+
+  it('restores shared result from URL params', () => {
+    // Set URL with share params: 2 people, 2 rooms, Alice->Master=$550, Bob->Guest=$450
+    const searchParams = new URLSearchParams({
+      p: 'Alice,Bob',
+      r: 'Master,Guest',
+      a: '0-0-550;1-1-450',
+      t: '1000',
+      f: '500',
+      e: '1',
+    });
+    Object.defineProperty(window, 'location', {
+      value: {
+        origin: 'https://example.com',
+        href: `https://example.com/?${searchParams.toString()}`,
+        search: `?${searchParams.toString()}`,
+      },
+      writable: true,
+    });
+
+    render(<App />);
+
+    // Should show the shared result immediately
+    expect(screen.getByText(/Fair Split Results/i)).toBeInTheDocument();
+    // Names appear in both input fields and results, so use getAllByText
+    expect(screen.getAllByText(/Alice/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Bob/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/\$550/)).toBeInTheDocument();
+    expect(screen.getByText(/\$450/)).toBeInTheDocument();
   });
 });
